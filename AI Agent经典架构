@@ -1,1 +1,846 @@
+如果你现在是在学 **AI Agent / LangChain**，那么“七大经典 Agent 架构”非常值得系统掌握。不同资料对“七大”的命名略有差异，但工程实践中通常可以归纳成下面这套框架。
+
+# AI Agent 七大经典架构
+
+先给你一张总览：
+
+| 架构                            | 核心思想               |   难度 | 典型应用           |
+| ----------------------------- | ------------------ | ---: | -------------- |
+| ① ReAct                       | 思考 → 行动 → 观察 → 再思考 |   ⭐⭐ | 工具调用、搜索 Agent  |
+| ② Plan-and-Execute            | 先制定计划，再执行          |  ⭐⭐⭐ | 复杂任务           |
+| ③ Reflection                  | 做完 → 自我检查 → 修改     |  ⭐⭐⭐ | 写作、代码、推理       |
+| ④ Tool Use / Function Calling | LLM 决定调用什么工具       |   ⭐⭐ | API、数据库、搜索     |
+| ⑤ Multi-Agent                 | 多个 Agent 分工协作      | ⭐⭐⭐⭐ | 软件开发、研究        |
+| ⑥ Router / Supervisor         | 一个 Agent 负责路由/调度   |  ⭐⭐⭐ | 企业级 Agent      |
+| ⑦ Workflow / Graph Agent      | 用状态机/图控制 Agent 流程  | ⭐⭐⭐⭐ | LangGraph、生产系统 |
+
+不过这里有一个非常重要的理解：
+
+> **这七种不是完全互斥的。**
+>
+> 一个真正的企业 Agent，往往是：
+>
+> **Router + Planning + ReAct + Tools + Reflection + Multi-Agent + Graph**
+
+---
+
+# ① ReAct Agent
+
+这是你**最应该首先掌握**的 Agent 架构。
+
+ReAct = **Reasoning + Acting**
+
+核心流程：
+
+```text
+用户问题
+   ↓
+LLM 思考
+   ↓
+决定是否需要工具
+   ↓
+调用 Tool
+   ↓
+获得 Observation
+   ↓
+再次思考
+   ↓
+调用 Tool / 直接回答
+   ↓
+最终答案
+```
+
+例如用户问：
+
+> 上海明天天气怎么样？
+
+Agent：
+
+```text
+用户问题
+   ↓
+LLM
+   ↓
+需要天气数据
+   ↓
+调用 weather_tool
+   ↓
+得到天气结果
+   ↓
+LLM 分析
+   ↓
+回答用户
+```
+
+抽象成：
+
+```text
+Thought
+   ↓
+Action
+   ↓
+Observation
+   ↓
+Thought
+   ↓
+Action
+   ↓
+Observation
+   ↓
+Final Answer
+```
+
+### ReAct 的核心
+
+Agent 不再是：
+
+```text
+用户 → LLM → 答案
+```
+
+而是：
+
+```text
+用户
+ ↓
+LLM
+ ↓
+工具
+ ↓
+结果
+ ↓
+LLM
+ ↓
+工具
+ ↓
+结果
+ ↓
+LLM
+ ↓
+答案
+```
+
+这就是 Agent 和普通 Chatbot 最大的区别之一。
+
+---
+
+# ② Plan-and-Execute
+
+ReAct 更适合动态任务。
+
+但是如果任务非常复杂，可以先：
+
+> **制定完整计划 → 再执行计划**
+
+例如：
+
+> 帮我分析一家公司的竞争力。
+
+Agent 首先制定：
+
+```text
+Plan
+
+1. 搜索公司基本信息
+2. 搜索产品信息
+3. 搜索竞争对手
+4. 搜索市场规模
+5. 对比竞争优势
+6. 生成分析报告
+```
+
+然后：
+
+```text
+Planner
+   ↓
+Plan
+   ↓
+Executor
+   ↓
+任务1
+   ↓
+任务2
+   ↓
+任务3
+   ↓
+任务4
+   ↓
+最终报告
+```
+
+它和 ReAct 的区别：
+
+### ReAct
+
+```text
+边想边做
+```
+
+### Plan-and-Execute
+
+```text
+先想清楚怎么做
+        ↓
+再执行
+```
+
+适合：
+
+* 市场调研
+* 旅游规划
+* 数据分析
+* 长文报告
+* 软件开发
+* 多步骤自动化
+
+---
+
+# ③ Reflection Agent
+
+Reflection 的核心是：
+
+> **让 Agent 自己检查自己的结果。**
+
+流程：
+
+```text
+任务
+ ↓
+Agent
+ ↓
+生成结果
+ ↓
+Critic
+ ↓
+发现问题
+ ↓
+Agent 修改
+ ↓
+再次检查
+ ↓
+最终结果
+```
+
+例如：
+
+> 写一份 Python 项目代码。
+
+第一次：
+
+```text
+Agent
+ ↓
+生成代码
+```
+
+然后：
+
+```text
+Reviewer
+ ↓
+发现：
+- API 使用错误
+- 异常处理不足
+- 缺少测试
+```
+
+然后：
+
+```text
+Agent
+ ↓
+修改代码
+```
+
+最后：
+
+```text
+Reviewer
+ ↓
+通过
+```
+
+所以：
+
+```text
+Generate
+   ↓
+Review
+   ↓
+Improve
+   ↓
+Review
+   ↓
+Final
+```
+
+这个架构特别适合：
+
+* Coding Agent
+* 文案
+* 报告
+* SQL
+* 数学推理
+* 数据分析
+
+---
+
+# ④ Tool Use / Function Calling Agent
+
+这是现代 Agent 最基础的能力之一。
+
+LLM 本身不能直接：
+
+```text
+查询数据库
+访问天气 API
+读取文件
+发送邮件
+执行 Python
+```
+
+所以我们给 LLM 一组工具：
+
+```text
+Tools
+
+weather()
+search()
+calculator()
+database()
+python()
+email()
+```
+
+然后让 LLM 自己决定：
+
+```text
+用户
+ ↓
+LLM
+ ↓
+需要查询数据库？
+ ↓
+Yes
+ ↓
+database()
+ ↓
+结果
+ ↓
+LLM
+ ↓
+回答
+```
+
+例如：
+
+```python
+tools = [
+    weather_tool,
+    search_tool,
+    calculator_tool,
+    database_tool
+]
+```
+
+LLM：
+
+```text
+用户：
+帮我查询北京今天温度，并计算华氏温度。
+
+LLM：
+我要调用 weather_tool
+
+weather_tool()
+↓
+25°C
+
+LLM：
+25 × 9 / 5 + 32
+↓
+77°F
+```
+
+所以 Agent 的核心能力之一就是：
+
+> **LLM + Tools**
+
+---
+
+# ⑤ Multi-Agent
+
+当一个 Agent 太复杂时，可以拆成多个 Agent。
+
+例如做一个“AI 软件开发团队”：
+
+```text
+                 Supervisor
+                     │
+       ┌─────────────┼─────────────┐
+       ↓             ↓             ↓
+  产品经理 Agent   程序员 Agent   测试 Agent
+                     │
+                     ↓
+                  Code
+                     │
+                     ↓
+                 Review Agent
+```
+
+比如：
+
+### Product Agent
+
+负责：
+
+```text
+需求分析
+功能设计
+```
+
+### Coding Agent
+
+负责：
+
+```text
+写代码
+```
+
+### Testing Agent
+
+负责：
+
+```text
+测试
+```
+
+### Reviewer Agent
+
+负责：
+
+```text
+代码审查
+```
+
+最终：
+
+```text
+用户
+ ↓
+Supervisor
+ ↓
+Product Agent
+ ↓
+Coding Agent
+ ↓
+Testing Agent
+ ↓
+Reviewer Agent
+ ↓
+最终结果
+```
+
+这就是 Multi-Agent。
+
+---
+
+# ⑥ Router / Supervisor Agent
+
+这个架构和 Multi-Agent 很接近。
+
+核心思想：
+
+> **一个中央 Agent 负责判断应该把任务交给谁。**
+
+例如：
+
+```text
+                用户
+                  ↓
+              Router
+                  ↓
+       ┌──────────┼──────────┐
+       ↓          ↓          ↓
+   RAG Agent   Coding Agent  SQL Agent
+       ↓          ↓          ↓
+     文档       代码        数据库
+```
+
+例如：
+
+> “帮我查询公司 2025 年销售额。”
+
+Router 判断：
+
+```text
+这是数据库问题
+ ↓
+SQL Agent
+```
+
+如果用户问：
+
+> “帮我解释这份技术文档。”
+
+Router：
+
+```text
+这是知识库问题
+ ↓
+RAG Agent
+```
+
+如果：
+
+> “帮我写一个 Python 爬虫。”
+
+Router：
+
+```text
+这是 Coding 问题
+ ↓
+Coding Agent
+```
+
+所以 Router 本质上是：
+
+```text
+Intent Classification
+        +
+Task Routing
+```
+
+---
+
+# ⑦ Workflow / Graph Agent
+
+这是你后面学习 **LangGraph** 时非常重要的架构。
+
+传统 Agent：
+
+```text
+LLM
+ ↓
+Tool
+ ↓
+LLM
+ ↓
+Tool
+```
+
+流程比较自由。
+
+而 Workflow / Graph Agent：
+
+```text
+        ┌──────────────┐
+        ↓              │
+START → Agent → Tool ──┘
+          │
+          ↓
+       判断结果
+        /    \
+      Yes     No
+       ↓       ↓
+     END    Retry
+```
+
+把整个 Agent 看成一个**有状态的图**：
+
+```text
+State
+ ↓
+Node
+ ↓
+Node
+ ↓
+Condition
+ ↓
+Node
+ ↓
+END
+```
+
+例如一个 RAG Agent：
+
+```text
+用户问题
+    ↓
+问题分析
+    ↓
+是否需要检索？
+   /      \
+ Yes       No
+  ↓         ↓
+Retriever  LLM
+  ↓
+Reranker
+  ↓
+LLM
+  ↓
+回答
+```
+
+这就是 Graph。
+
+而你以后学习：
+
+**LangGraph**
+
+实际上就是在学习：
+
+> **如何用图来构建复杂 Agent。**
+
+---
+
+# 七种架构之间的关系
+
+你不要把它们理解成七个完全独立的东西。
+
+实际上可以这样理解：
+
+```text
+                    AI Agent
+                       │
+        ┌──────────────┼──────────────┐
+        ↓              ↓              ↓
+      Reasoning      Planning        Tools
+        │              │              │
+      ReAct      Plan-Execute    Function Calling
+        │              │              │
+        └──────────────┼──────────────┘
+                       ↓
+                   Reflection
+                       ↓
+                 Multi-Agent
+                       ↓
+               Router / Supervisor
+                       ↓
+                  Graph Workflow
+```
+
+---
+
+# 对你来说，应该怎么学？
+
+结合你前面已经学过的：
+
+```text
+Python
+ ↓
+深度学习
+ ↓
+LLM基础
+ ↓
+LangChain
+ ↓
+Document
+ ↓
+Text Splitter
+ ↓
+Embedding
+ ↓
+Vector DB
+ ↓
+RAG
+ ↓
+RAG优化
+```
+
+你现在已经到了非常适合进入 **Agent 架构** 的阶段。
+
+我建议你不要七个一起学。
+
+按照这个顺序：
+
+### 第一阶段：Tool Calling
+
+先学：
+
+```text
+LLM
+ ↓
+Tool
+ ↓
+Tool Result
+ ↓
+LLM
+```
+
+掌握：
+
+* Function Calling
+* Structured Output
+* Tool
+* 参数定义
+* Tool Result
+
+---
+
+### 第二阶段：ReAct
+
+然后：
+
+```text
+LLM
+ ↓
+Tool
+ ↓
+Observation
+ ↓
+LLM
+```
+
+做一个：
+
+> **天气查询 Agent**
+
+---
+
+### 第三阶段：RAG Agent
+
+把你已经学过的 RAG 加进来：
+
+```text
+User
+ ↓
+Agent
+ ↓
+判断
+ ├── 普通问题 → LLM
+ │
+ └── 知识库问题
+        ↓
+      Retriever
+        ↓
+      Reranker
+        ↓
+       LLM
+```
+
+这一步非常重要。
+
+因为你会真正理解：
+
+> **RAG 是 Agent 的一种工具，而不是 Agent 本身。**
+
+---
+
+### 第四阶段：Reflection
+
+做：
+
+> **AI Coding Agent**
+
+```text
+需求
+ ↓
+生成代码
+ ↓
+运行代码
+ ↓
+发现错误
+ ↓
+修改代码
+ ↓
+再次运行
+ ↓
+通过
+```
+
+---
+
+### 第五阶段：Planning
+
+然后做：
+
+> **研究报告 Agent**
+
+```text
+用户任务
+ ↓
+Planner
+ ↓
+任务拆解
+ ↓
+Search
+ ↓
+资料整理
+ ↓
+分析
+ ↓
+报告
+```
+
+---
+
+### 第六阶段：Multi-Agent
+
+再做：
+
+```text
+Supervisor
+    ↓
+┌───┼────┐
+↓   ↓    ↓
+RAG Search Coding
+↓   ↓    ↓
+└───┼────┘
+    ↓
+  Reviewer
+    ↓
+  Final
+```
+
+---
+
+### 第七阶段：LangGraph
+
+最后把前面全部串起来：
+
+```text
+                    LangGraph
+                        │
+        ┌───────────────┼───────────────┐
+        ↓               ↓               ↓
+     ReAct          Planning        Reflection
+        │               │               │
+        └───────────────┼───────────────┘
+                        ↓
+                  Multi-Agent
+                        ↓
+                Production Agent
+```
+
+## 你最终要达到的能力
+
+不是简单地“会调用 LangChain”。
+
+而是能够看到一个需求，就能判断：
+
+```text
+这个问题简单
+→ Tool Calling
+
+这个问题需要动态调用工具
+→ ReAct
+
+这个问题步骤很多
+→ Planning
+
+这个问题需要自我检查
+→ Reflection
+
+这个问题需要多个角色
+→ Multi-Agent
+
+这个问题需要任务分发
+→ Router / Supervisor
+
+这个系统流程复杂、需要状态管理
+→ LangGraph
+```
+
 
